@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Duty Calendar - Aug to Dec 2025</title>
+  <title>RIT CRL Fall 2025 Duty Pick</title>
   <style>
     body {
       font-family: Arial, sans-serif;
@@ -58,7 +58,6 @@
     .overlay {
       position: absolute;
       font-size: 40px;
-      color: transparent;
       font-weight: bold;
       top: 50%;
       left: 50%;
@@ -82,7 +81,7 @@
   </style>
 </head>
 <body>
-  <h1 style="text-align:center;">Duty Calendar - Aug 16 to Dec 17, 2025</h1>
+  <h1 style="text-align:center;">RIT CRL Fall 2025 Duty Pick</h1>
   <div class="calendar-grid" id="topRow"></div>
   <div class="row-two" id="bottomRow"></div>
 
@@ -105,9 +104,7 @@
     }
 
     function isBlackoutDate(month, day) {
-      const blackoutDates = [
-        "2025-11-26", "2025-11-27", "2025-11-28", "2025-11-29"
-      ];
+      const blackoutDates = ["2025-11-26", "2025-11-27", "2025-11-28", "2025-11-29"];
       const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
       return blackoutDates.includes(key);
     }
@@ -145,6 +142,7 @@
         const weekday = new Date(year, month - 1, day).getDay();
         const dayDiv = document.createElement("div");
         dayDiv.className = "day";
+        let isActive = true;
 
         if ((weekday === 5 || weekday === 6) || (month === 8 && day === 31)) {
           dayDiv.classList.add("weekend");
@@ -152,14 +150,17 @@
 
         if (!isWithinRange(month, day) || isBlackoutDate(month, day)) {
           dayDiv.classList.add("disabled");
-        } else {
-          const overlay = document.createElement("div");
-          overlay.className = "overlay";
-          overlay.textContent = calendarState[dateKey] || "";
+          isActive = false;
+        }
 
-          if (overlay.textContent === "/") overlay.classList.add("slash");
-          else if (overlay.textContent === "X") overlay.classList.add("x");
+        const overlay = document.createElement("div");
+        overlay.className = "overlay";
+        const saved = calendarState[dateKey] || "";
+        overlay.textContent = saved;
+        if (saved === "/") overlay.classList.add("slash");
+        else if (saved === "X") overlay.classList.add("x");
 
+        if (isActive) {
           dayDiv.addEventListener("click", () => {
             const currentState = calendarState[dateKey] || "";
             const nextState = states[(states.indexOf(currentState) + 1) % states.length];
@@ -170,12 +171,10 @@
             else if (nextState === "X") overlay.classList.add("x");
             saveState();
           });
-
-          overlay.classList.add("overlay");
-          dayDiv.appendChild(overlay);
         }
 
         dayDiv.textContent = day;
+        dayDiv.appendChild(overlay);
         daysDiv.appendChild(dayDiv);
       }
 

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Duty Calendar - Aug to Dec 2025</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f0f0f0;
+      margin: 0;
+      padding: 20px;
+    }
+    .calendar-grid {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      justify-content: center;
+    }
+    .month {
+      background: #fff;
+      border: 2px solid #333;
+      padding: 10px;
+      width: 300px;
+    }
+    .month-title {
+      font-size: 20px;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .day-names, .days {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+      text-align: center;
+    }
+    .day-names div {
+      font-weight: bold;
+      background: #ddd;
+      padding: 5px;
+    }
+    .day {
+      background: white;
+      border: 1px solid #ccc;
+      padding: 20px 0;
+      font-size: 16px;
+      position: relative;
+      cursor: pointer;
+      height: 60px;
+    }
+    .overlay {
+      position: absolute;
+      top: 10px;
+      left: 0;
+      right: 0;
+      text-align: center;
+      font-size: 36px;
+      color: rgba(255, 0, 0, 0.4);
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Duty Calendar - Aug to Dec 2025</h1>
+  <div class="calendar-grid" id="calendarGrid"></div>
+
+  <script>
+    const monthsToRender = [8, 9, 10, 11, 12];
+    const year = 2025;
+    const states = ["", "/", "X"];
+    const stateKey = "duty_calendar_data";
+    let calendarState = JSON.parse(localStorage.getItem(stateKey) || "{}");
+
+    function saveState() {
+      localStorage.setItem(stateKey, JSON.stringify(calendarState));
+    }
+
+    function createCalendar(month) {
+      const monthDiv = document.createElement("div");
+      monthDiv.className = "month";
+      const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
+      monthDiv.innerHTML = `<div class="month-title">${monthName} ${year}</div>`;
+
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dayNamesDiv = document.createElement("div");
+      dayNamesDiv.className = "day-names";
+      dayNames.forEach(d => {
+        const dn = document.createElement("div");
+        dn.textContent = d;
+        dayNamesDiv.appendChild(dn);
+      });
+      monthDiv.appendChild(dayNamesDiv);
+
+      const daysDiv = document.createElement("div");
+      daysDiv.className = "days";
+
+      const firstDay = new Date(year, month - 1, 1).getDay();
+      const numDays = new Date(year, month, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        daysDiv.appendChild(document.createElement("div")); // empty
+      }
+
+      for (let day = 1; day <= numDays; day++) {
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+        const dayDiv = document.createElement("div");
+        dayDiv.className = "day";
+        const overlay = document.createElement("div");
+        overlay.className = "overlay";
+        overlay.textContent = calendarState[dateKey] || "";
+        dayDiv.textContent = day;
+        dayDiv.appendChild(overlay);
+
+        dayDiv.addEventListener("click", () => {
+          const currentState = calendarState[dateKey] || "";
+          const nextState = states[(states.indexOf(currentState) + 1) % states.length];
+          calendarState[dateKey] = nextState;
+          overlay.textContent = nextState;
+          saveState();
+        });
+
+        daysDiv.appendChild(dayDiv);
+      }
+
+      monthDiv.appendChild(daysDiv);
+      return monthDiv;
+    }
+
+    const grid = document.getElementById("calendarGrid");
+    monthsToRender.forEach(m => grid.appendChild(createCalendar(m)));
+  </script>
+</body>
+</html>

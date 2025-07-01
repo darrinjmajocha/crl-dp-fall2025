@@ -12,16 +12,21 @@
       padding: 20px;
     }
     .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      justify-items: center;
+    }
+    .row-two {
       display: flex;
-      flex-wrap: wrap;
       gap: 20px;
       justify-content: center;
+      margin-top: 20px;
     }
     .month {
       background: #fff;
       border: 2px solid #333;
       padding: 10px;
-      width: 300px;
     }
     .month-title {
       font-size: 20px;
@@ -32,7 +37,6 @@
     .day-names, .days {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 2px;
       text-align: center;
     }
     .day-names div {
@@ -42,28 +46,37 @@
     }
     .day {
       background: white;
-      border: 1px solid #ccc;
-      padding: 20px 0;
-      font-size: 16px;
-      position: relative;
-      cursor: pointer;
+      border: 1px solid #aaa;
       height: 60px;
+      position: relative;
+      font-size: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
     }
     .overlay {
       position: absolute;
-      top: 10px;
-      left: 0;
-      right: 0;
-      text-align: center;
-      font-size: 36px;
-      color: rgba(255, 0, 0, 0.4);
+      font-size: 40px;
+      color: transparent;
+      font-weight: bold;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       pointer-events: none;
+    }
+    .overlay.slash {
+      color: rgba(85, 85, 255, 0.4);
+    }
+    .overlay.x {
+      color: rgba(255, 85, 85, 0.4);
     }
   </style>
 </head>
 <body>
-  <h1>Duty Calendar - Aug to Dec 2025</h1>
-  <div class="calendar-grid" id="calendarGrid"></div>
+  <h1 style="text-align:center;">Duty Calendar - Aug to Dec 2025</h1>
+  <div class="calendar-grid" id="topRow"></div>
+  <div class="row-two" id="bottomRow"></div>
 
   <script>
     const monthsToRender = [8, 9, 10, 11, 12];
@@ -99,7 +112,9 @@
       const numDays = new Date(year, month, 0).getDate();
 
       for (let i = 0; i < firstDay; i++) {
-        daysDiv.appendChild(document.createElement("div")); // empty
+        const emptyCell = document.createElement("div");
+        emptyCell.className = "day";
+        daysDiv.appendChild(emptyCell);
       }
 
       for (let day = 1; day <= numDays; day++) {
@@ -109,6 +124,10 @@
         const overlay = document.createElement("div");
         overlay.className = "overlay";
         overlay.textContent = calendarState[dateKey] || "";
+
+        if (overlay.textContent === "/") overlay.classList.add("slash");
+        else if (overlay.textContent === "X") overlay.classList.add("x");
+
         dayDiv.textContent = day;
         dayDiv.appendChild(overlay);
 
@@ -117,6 +136,9 @@
           const nextState = states[(states.indexOf(currentState) + 1) % states.length];
           calendarState[dateKey] = nextState;
           overlay.textContent = nextState;
+          overlay.className = "overlay";
+          if (nextState === "/") overlay.classList.add("slash");
+          else if (nextState === "X") overlay.classList.add("x");
           saveState();
         });
 
@@ -127,8 +149,13 @@
       return monthDiv;
     }
 
-    const grid = document.getElementById("calendarGrid");
-    monthsToRender.forEach(m => grid.appendChild(createCalendar(m)));
+    const topRow = document.getElementById("topRow");
+    const bottomRow = document.getElementById("bottomRow");
+    monthsToRender.forEach((m, i) => {
+      const cal = createCalendar(m);
+      if (i < 3) topRow.appendChild(cal);
+      else bottomRow.appendChild(cal);
+    });
   </script>
 </body>
 </html>

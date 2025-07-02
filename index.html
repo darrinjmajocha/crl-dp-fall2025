@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RIT CRL Fall 2025 Duty Pick</title>
   <style>
     body {
@@ -11,68 +11,97 @@
       margin: 0;
       padding: 20px;
     }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      margin: 0;
+    }
+
+    select {
+      font-size: 16px;
+      padding: 5px 10px;
+    }
+
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 20px;
       justify-items: center;
     }
+
     .row-two {
       display: flex;
       gap: 20px;
       justify-content: center;
       margin-top: 20px;
     }
+
     .month {
       background: #fff;
       border: 2px solid #333;
       padding: 10px;
     }
+
     .month-title {
       font-size: 20px;
       font-weight: bold;
       text-align: center;
       margin-bottom: 10px;
     }
+
     .day-names, .days {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       text-align: center;
     }
+
     .day-names div {
       font-weight: bold;
       background: #ddd;
       padding: 5px;
     }
+
     .day {
       background: white;
       border: 1px solid #aaa;
-      height: 60px;
+      width: 70px;
+      height: 70px;
       position: relative;
-      font-size: 16px;
+      font-size: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
       cursor: pointer;
     }
+
     .overlay {
       position: absolute;
-      font-size: 40px;
+      font-size: 48px;
       font-weight: bold;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
     }
+
     .overlay.slash {
       color: rgba(85, 85, 255, 0.4);
     }
+
     .overlay.x {
       color: rgba(255, 85, 85, 0.4);
     }
+
     .weekend {
       background-color: rgba(0, 128, 0, 0.1);
     }
+
     .disabled {
       background-color: #ccc;
       pointer-events: none;
@@ -81,7 +110,15 @@
   </style>
 </head>
 <body>
-  <h1 style="text-align:center;">RIT CRL Fall 2025 Duty Pick</h1>
+
+  <header>
+    <h1>RIT CRL Fall 2025 Duty Pick</h1>
+    <select id="actionsDropdown">
+      <option disabled selected>Options</option>
+      <option value="clear">Clear All Marks</option>
+    </select>
+  </header>
+
   <div class="calendar-grid" id="topRow"></div>
   <div class="row-two" id="bottomRow"></div>
 
@@ -188,6 +225,20 @@
       const cal = createCalendar(m);
       if (i < 3) topRow.appendChild(cal);
       else bottomRow.appendChild(cal);
+    });
+
+    // Dropdown menu actions
+    document.getElementById("actionsDropdown").addEventListener("change", function () {
+      if (this.value === "clear") {
+        const confirmClear = confirm("Are you sure you want to clear all slashes and Xs from the calendar?");
+        if (confirmClear) {
+          calendarState = {};
+          localStorage.removeItem(stateKey);
+          location.reload();
+        } else {
+          this.value = "Options";
+        }
+      }
     });
   </script>
 </body>

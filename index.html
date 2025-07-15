@@ -13,56 +13,62 @@
       transform: scale(0.95);
       transform-origin: top center;
     }
+
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
     }
+
     h1 {
       margin: 0;
     }
-    #nextName {
-      font-size: 16px;
-      font-weight: bold;
-    }
+
     select {
       font-size: 16px;
       padding: 5px 10px;
     }
+
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 20px;
       justify-items: center;
     }
+
     .row-two {
       display: flex;
       gap: 20px;
       justify-content: center;
       margin-top: 20px;
     }
+
     .month {
       background: #fff;
       border: 2px solid #333;
       padding: 10px;
     }
+
     .month-title {
       font-size: 20px;
       font-weight: bold;
       text-align: center;
       margin-bottom: 10px;
     }
+
     .day-names, .days {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       text-align: center;
     }
+
     .day-names div {
       font-weight: bold;
       background: #ddd;
       padding: 5px;
     }
+
     .day {
       background: white;
       border: 1px solid #aaa;
@@ -71,156 +77,82 @@
       position: relative;
       font-size: 20px;
       display: flex;
-      flex-direction: column;
-      justify-content: center;
       align-items: center;
+      justify-content: center;
       cursor: pointer;
     }
+
     .overlay {
       position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      bottom: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 70px;
+      font-size: 65px;
       font-weight: bold;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
       pointer-events: none;
     }
+
     .overlay.slash {
       color: rgba(85, 85, 255, 0.4);
     }
+
     .overlay.x {
       color: rgba(255, 85, 85, 0.4);
     }
-    .name-label {
-      font-size: 11px;
-      color: #333;
-      text-align: center;
-      z-index: 1;
-    }
+
     .weekend {
       background-color: rgba(0, 128, 0, 0.1);
     }
+
     .disabled {
-      background-color: #ccc !important;
-      color: #888 !important;
-    }
-    #raInputArea {
-      margin-bottom: 20px;
-    }
-    textarea {
-      width: 100%;
-      height: 200px;
-      font-family: monospace;
-    }
-    button {
-      margin-top: 10px;
-      padding: 5px 15px;
+      background-color: #ccc;
+      pointer-events: none;
+      color: #888;
     }
   </style>
 </head>
 <body>
-  <div id="raInputArea">
-    <h2>Enter RA Names (First Last, one per line)</h2>
-    <textarea id="raList"></textarea>
-    <br />
-    <button onclick="startCalendar()">Start Duty Pick</button>
-  </div>
 
-  <header style="display:none">
+  <header>
     <h1>RIT CRL Fall 2025 Duty Pick</h1>
-    <div id="nextName">Next Selection: </div>
     <select id="actionsDropdown">
       <option disabled selected>Options</option>
-      <option value="reset">Reset Calendar</option>
+      <option value="clear">Clear All Marks</option>
     </select>
   </header>
 
-  <div class="calendar-grid" id="topRow" style="display:none"></div>
-  <div class="row-two" id="bottomRow" style="display:none"></div>
+  <div class="calendar-grid" id="topRow"></div>
+  <div class="row-two" id="bottomRow"></div>
 
   <script>
     const monthsToRender = [8, 9, 10, 11, 12];
     const year = 2025;
     const states = ["", "/", "X"];
-    let raList = JSON.parse(localStorage.getItem("raList")) || [];
-    let raIndex = parseInt(localStorage.getItem("raIndex")) || 0;
-    let history = [];
+    const stateKey = "duty_calendar_data";
+    let calendarState = JSON.parse(localStorage.getItem(stateKey) || "{}");
 
-    document.getElementById("actionsDropdown").addEventListener("change", function () {
-      if (this.value === "reset") {
-        if (confirm("Are you sure you want to reset the calendar? This will erase all progress.")) {
-          localStorage.clear();
-          location.reload();
-        } else {
-          this.value = "reset";
-        }
-      }
-    });
-
-    document.addEventListener("keydown", e => {
-      if (e.ctrlKey && e.key === "z") {
-        const last = history.pop();
-        if (last) {
-          const { overlay, label, prev, nextIndex, locked, cell } = last;
-          overlay.dataset.state = prev;
-          overlay.textContent = prev;
-          overlay.className = "overlay";
-          if (prev === "/") overlay.classList.add("slash");
-          else if (prev === "X") overlay.classList.add("x");
-          label.innerHTML = prev === "/" ? overlay.dataset.slashName : prev === "X" ? ${overlay.dataset.slashName}<br>${overlay.dataset.xName} : "";
-          raIndex = nextIndex;
-          updateNextName();
-          cell.dataset.locked = locked;
-        }
-      }
-    });
-
-    function startCalendar() {
-      const raw = document.getElementById("raList").value.trim().split("\n").slice(0, 40);
-      raList = raw.map(line => {
-        const parts = line.trim().split(" ");
-        return { full: line.trim(), first: parts[0] || "" };
-      });
-      raIndex = 0;
-      localStorage.setItem("raList", JSON.stringify(raList));
-      localStorage.setItem("raIndex", raIndex);
-
-      document.getElementById("raInputArea").style.display = "none";
-      document.querySelector("header").style.display = "flex";
-      document.getElementById("topRow").style.display = "grid";
-      document.getElementById("bottomRow").style.display = "flex";
-
-      renderCalendars();
+    function saveState() {
+      localStorage.setItem(stateKey, JSON.stringify(calendarState));
     }
 
-    function renderCalendars() {
-      const topRow = document.getElementById("topRow");
-      const bottomRow = document.getElementById("bottomRow");
-      topRow.innerHTML = "";
-      bottomRow.innerHTML = "";
-      monthsToRender.forEach((m, i) => {
-        const cal = createCalendar(m);
-        if (i < 3) topRow.appendChild(cal);
-        else bottomRow.appendChild(cal);
-      });
-      updateNextName();
+    function isWithinRange(month, day) {
+      const current = new Date(year, month - 1, day);
+      const start = new Date(year, 7, 16); // August 16
+      const end = new Date(year, 11, 17); // December 17
+      return current >= start && current <= end;
     }
 
-    function updateNextName() {
-      const next = raList[raIndex % raList.length]?.full || "N/A";
-      document.getElementById("nextName").textContent = Next Selection: ${next};
-      localStorage.setItem("raIndex", raIndex);
+    function isBlackoutDate(month, day) {
+      const blackoutDates = ["2025-11-26", "2025-11-27", "2025-11-28", "2025-11-29"];
+      const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+      return blackoutDates.includes(key);
     }
 
     function createCalendar(month) {
       const monthDiv = document.createElement("div");
       monthDiv.className = "month";
       const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
-      monthDiv.innerHTML = <div class="month-title">${monthName} ${year}</div>;
+      monthDiv.innerHTML = `<div class="month-title">${monthName} ${year}</div>`;
 
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const dayNamesDiv = document.createElement("div");
@@ -245,73 +177,71 @@
       }
 
       for (let day = 1; day <= numDays; day++) {
+        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
         const weekday = new Date(year, month - 1, day).getDay();
         const dayDiv = document.createElement("div");
         dayDiv.className = "day";
+        let isActive = true;
+
         if ((weekday === 5 || weekday === 6) || (month === 8 && day === 31)) {
           dayDiv.classList.add("weekend");
         }
 
+        if (!isWithinRange(month, day) || isBlackoutDate(month, day)) {
+          dayDiv.classList.add("disabled");
+          isActive = false;
+        }
+
         const overlay = document.createElement("div");
         overlay.className = "overlay";
-        const label = document.createElement("div");
-        label.className = "name-label";
-        overlay.dataset.state = "";
-        overlay.dataset.slashName = "";
-        overlay.dataset.xName = "";
+        const saved = calendarState[dateKey] || "";
+        overlay.textContent = saved;
+        if (saved === "/") overlay.classList.add("slash");
+        else if (saved === "X") overlay.classList.add("x");
 
-        overlay.textContent = "";
-        dayDiv.innerHTML = ${day};
+        if (isActive) {
+          dayDiv.addEventListener("click", () => {
+            const currentState = calendarState[dateKey] || "";
+            const nextState = states[(states.indexOf(currentState) + 1) % states.length];
+            calendarState[dateKey] = nextState;
+            overlay.textContent = nextState;
+            overlay.className = "overlay";
+            if (nextState === "/") overlay.classList.add("slash");
+            else if (nextState === "X") overlay.classList.add("x");
+            saveState();
+          });
+        }
+
+        dayDiv.textContent = day;
         dayDiv.appendChild(overlay);
-        dayDiv.appendChild(label);
-
-        dayDiv.dataset.locked = "false";
-
-        dayDiv.addEventListener("click", (e) => {
-          if (e.ctrlKey) {
-            dayDiv.classList.toggle("disabled");
-            return;
-          }
-
-          if (dayDiv.classList.contains("disabled") || dayDiv.dataset.locked === "true") return;
-
-          const current = overlay.dataset.state;
-          const nextIndex = (states.indexOf(current) + 1) % states.length;
-          const next = states[nextIndex];
-
-          history.push({ overlay, label, prev: current, nextIndex: raIndex, locked: dayDiv.dataset.locked, cell: dayDiv });
-
-          overlay.dataset.state = next;
-          overlay.textContent = next;
-          overlay.className = "overlay";
-
-          if (next === "/") {
-            overlay.classList.add("slash");
-            overlay.dataset.slashName = raList[raIndex % raList.length]?.first || "";
-            label.innerHTML = ${overlay.dataset.slashName};
-            raIndex++;
-          } else if (next === "X") {
-            overlay.classList.add("x");
-            overlay.dataset.xName = raList[raIndex % raList.length]?.first || "";
-            label.innerHTML = ${overlay.dataset.slashName}<br>${overlay.dataset.xName};
-            raIndex++;
-            dayDiv.dataset.locked = "true";
-          } else {
-            overlay.dataset.slashName = "";
-            overlay.dataset.xName = "";
-            label.innerHTML = "";
-            dayDiv.dataset.locked = "false";
-          }
-
-          updateNextName();
-        });
-
         daysDiv.appendChild(dayDiv);
       }
 
       monthDiv.appendChild(daysDiv);
       return monthDiv;
     }
+
+    const topRow = document.getElementById("topRow");
+    const bottomRow = document.getElementById("bottomRow");
+    monthsToRender.forEach((m, i) => {
+      const cal = createCalendar(m);
+      if (i < 3) topRow.appendChild(cal);
+      else bottomRow.appendChild(cal);
+    });
+
+    // Dropdown menu actions
+    document.getElementById("actionsDropdown").addEventListener("change", function () {
+      if (this.value === "clear") {
+        const confirmClear = confirm("Are you sure you want to clear all slashes and Xs from the calendar?");
+        if (confirmClear) {
+          calendarState = {};
+          localStorage.removeItem(stateKey);
+          location.reload();
+        } else {
+          this.value = "Options";
+        }
+      }
+    });
   </script>
 </body>
 </html>

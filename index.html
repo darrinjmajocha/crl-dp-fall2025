@@ -4,243 +4,298 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RIT CRL Fall 2025 Duty Pick</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f0f0f0;
       margin: 0;
       padding: 20px;
-      transform: scale(0.95);
+      transform: scale(0.93);
       transform-origin: top center;
     }
-
     header {
       display: flex;
       justify-content: space-between;
       align-items: center;
       margin-bottom: 20px;
     }
-
     h1 {
       margin: 0;
     }
-
     select {
       font-size: 16px;
       padding: 5px 10px;
     }
-
     .calendar-grid {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 20px;
       justify-items: center;
     }
-
     .row-two {
       display: flex;
       gap: 20px;
       justify-content: center;
       margin-top: 20px;
     }
-
     .month {
       background: #fff;
       border: 2px solid #333;
       padding: 10px;
     }
-
     .month-title {
       font-size: 20px;
       font-weight: bold;
       text-align: center;
       margin-bottom: 10px;
     }
-
     .day-names, .days {
       display: grid;
       grid-template-columns: repeat(7, 1fr);
       text-align: center;
     }
-
     .day-names div {
       font-weight: bold;
       background: #ddd;
       padding: 5px;
     }
-
     .day {
       background: white;
       border: 1px solid #aaa;
-      width: 70px;
-      height: 70px;
+      width: 85px;
+      height: 85px;
       position: relative;
-      font-size: 20px;
+      font-size: 22px;
       display: flex;
-      align-items: center;
-      justify-content: center;
+      align-items: flex-start;
+      justify-content: flex-start;
+      padding: 5px;
+      box-sizing: border-box;
       cursor: pointer;
+      flex-direction: column;
     }
-
     .overlay {
       position: absolute;
-      font-size: 65px;
+      font-size: 85px;
       font-weight: bold;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       pointer-events: none;
     }
-
     .overlay.slash {
-      color: rgba(85, 85, 255, 0.4);
+      color: rgba(85, 85, 255, 0.3);
     }
-
     .overlay.x {
-      color: rgba(255, 85, 85, 0.4);
+      color: rgba(255, 85, 85, 0.3);
     }
-
     .weekend {
       background-color: rgba(0, 128, 0, 0.1);
     }
-
     .disabled {
       background-color: #ccc;
       pointer-events: none;
       color: #888;
     }
+    .ra-name {
+      font-size: 12px;
+      margin-top: auto;
+      align-self: center;
+    }
+    #raInputScreen {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-width: 600px;
+      margin: auto;
+    }
+    textarea {
+      width: 100%;
+      height: 300px;
+    }
+    #nextUp {
+      font-weight: bold;
+      font-size: 16px;
+    }
   </style>
 </head>
 <body>
+  <div id="raInputScreen">
+    <h1>Enter RA Names (One Per Line)</h1>
+    <textarea id="raList"></textarea>
+    <button onclick="startCalendar()">Start Duty Pick</button>
+  </div>
 
-  <header>
-    <h1>RIT CRL Fall 2025 Duty Pick</h1>
-    <select id="actionsDropdown">
-      <option disabled selected>Options</option>
-      <option value="clear">Clear All Marks</option>
-    </select>
-  </header>
-
-  <div class="calendar-grid" id="topRow"></div>
-  <div class="row-two" id="bottomRow"></div>
+  <div id="calendarApp" style="display:none">
+    <header>
+      <h1>RIT CRL Fall 2025 Duty Pick</h1>
+      <div id="nextUp"></div>
+      <select id="actionsDropdown">
+        <option disabled selected>Options</option>
+        <option value="clear">Clear All Marks</option>
+        <option value="reset">Reset Calendar</option>
+        <option value="export">Finalize and Export</option>
+      </select>
+    </header>
+    <div class="calendar-grid" id="topRow"></div>
+    <div class="row-two" id="bottomRow"></div>
+  </div>
 
   <script>
     const monthsToRender = [8, 9, 10, 11, 12];
     const year = 2025;
-    const states = ["", "/", "X"];
-    const stateKey = "duty_calendar_data";
-    let calendarState = JSON.parse(localStorage.getItem(stateKey) || "{}");
+    let calendarState = {};  // format: { "2025-08-16": { names: ["RA Name"], disabled: false } }
+    let raList = [];
+    let raIndex = 0;
+    let history = [];
+    let redoStack = [];
 
-    function saveState() {
-      localStorage.setItem(stateKey, JSON.stringify(calendarState));
+    function saveHistory(dateKey, name) {
+      history.push({ dateKey, name });
+      redoStack = [];
+    }
+
+    function undo() {
+      const last = history.pop();
+      if (!last) return;
+      if (calendarState[last.dateKey]) {
+        calendarState[last.dateKey].names.pop();
+        redoStack.push(last);
+        renderCalendar();
+      }
+    }
+
+    function redo() {
+      const last = redoStack.pop();
+      if (!last) return;
+      if (calendarState[last.dateKey]) {
+        calendarState[last.dateKey].names.push(last.name);
+        history.push(last);
+        renderCalendar();
+      }
+    }
+
+    function startCalendar() {
+      const text = document.getElementById("raList").value.trim();
+      raList = text.split("\n").map(x => x.trim()).filter(x => x).slice(0, 40);
+      if (raList.length === 0) return alert("Please enter at least one RA name.");
+      document.getElementById("raInputScreen").style.display = "none";
+      document.getElementById("calendarApp").style.display = "block";
+      renderCalendar();
+    }
+
+    function renderCalendar() {
+      document.getElementById("topRow").innerHTML = "";
+      document.getElementById("bottomRow").innerHTML = "";
+      document.getElementById("nextUp").innerText = `Next Selection: ${raList[raIndex] || ""}`;
+
+      monthsToRender.forEach((month, i) => {
+        const cal = createCalendar(month);
+        if (i < 3) document.getElementById("topRow").appendChild(cal);
+        else document.getElementById("bottomRow").appendChild(cal);
+      });
     }
 
     function isWithinRange(month, day) {
       const current = new Date(year, month - 1, day);
-      const start = new Date(year, 7, 16); // August 16
-      const end = new Date(year, 11, 17); // December 17
+      const start = new Date(year, 7, 16);
+      const end = new Date(year, 11, 17);
       return current >= start && current <= end;
     }
 
     function isBlackoutDate(month, day) {
-      const blackoutDates = ["2025-11-26", "2025-11-27", "2025-11-28", "2025-11-29"];
-      const key = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-      return blackoutDates.includes(key);
+      const blackout = ["2025-11-26","2025-11-27","2025-11-28","2025-11-29"];
+      const key = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      return blackout.includes(key);
     }
 
     function createCalendar(month) {
-      const monthDiv = document.createElement("div");
-      monthDiv.className = "month";
-      const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
-      monthDiv.innerHTML = `<div class="month-title">${monthName} ${year}</div>`;
+      const div = document.createElement("div");
+      div.className = "month";
+      div.innerHTML = `<div class='month-title'>${new Date(year, month-1).toLocaleString('default', {month:'long'})} ${year}</div>`;
 
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const dayNamesDiv = document.createElement("div");
-      dayNamesDiv.className = "day-names";
-      dayNames.forEach(d => {
-        const dn = document.createElement("div");
-        dn.textContent = d;
-        dayNamesDiv.appendChild(dn);
-      });
-      monthDiv.appendChild(dayNamesDiv);
+      const daysHeader = document.createElement("div");
+      daysHeader.className = "day-names";
+      dayNames.forEach(d => daysHeader.innerHTML += `<div>${d}</div>`);
+      div.appendChild(daysHeader);
 
       const daysDiv = document.createElement("div");
       daysDiv.className = "days";
 
       const firstDay = new Date(year, month - 1, 1).getDay();
       const numDays = new Date(year, month, 0).getDate();
-
-      for (let i = 0; i < firstDay; i++) {
-        const emptyCell = document.createElement("div");
-        emptyCell.className = "day";
-        daysDiv.appendChild(emptyCell);
-      }
+      for (let i = 0; i < firstDay; i++) daysDiv.appendChild(document.createElement("div"));
 
       for (let day = 1; day <= numDays; day++) {
-        const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const weekday = new Date(year, month - 1, day).getDay();
-        const dayDiv = document.createElement("div");
-        dayDiv.className = "day";
-        let isActive = true;
+        const dateKey = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+        const weekday = new Date(year, month-1, day).getDay();
+        const d = document.createElement("div");
+        d.className = "day";
+        if ((weekday === 5 || weekday === 6) || (month === 8 && day === 31)) d.classList.add("weekend");
+        if (!isWithinRange(month, day) || isBlackoutDate(month, day)) d.classList.add("disabled");
 
-        if ((weekday === 5 || weekday === 6) || (month === 8 && day === 31)) {
-          dayDiv.classList.add("weekend");
-        }
+        d.innerHTML = `${day}<div class='ra-name'>${(calendarState[dateKey]?.names || []).join(", ")}</div>`;
 
-        if (!isWithinRange(month, day) || isBlackoutDate(month, day)) {
-          dayDiv.classList.add("disabled");
-          isActive = false;
-        }
-
-        const overlay = document.createElement("div");
-        overlay.className = "overlay";
-        const saved = calendarState[dateKey] || "";
-        overlay.textContent = saved;
-        if (saved === "/") overlay.classList.add("slash");
-        else if (saved === "X") overlay.classList.add("x");
-
-        if (isActive) {
-          dayDiv.addEventListener("click", () => {
-            const currentState = calendarState[dateKey] || "";
-            const nextState = states[(states.indexOf(currentState) + 1) % states.length];
-            calendarState[dateKey] = nextState;
-            overlay.textContent = nextState;
-            overlay.className = "overlay";
-            if (nextState === "/") overlay.classList.add("slash");
-            else if (nextState === "X") overlay.classList.add("x");
-            saveState();
+        if (!d.classList.contains("disabled")) {
+          d.addEventListener("click", e => {
+            if (e.ctrlKey) {
+              calendarState[dateKey] = { names: [], disabled: true };
+              renderCalendar();
+              return;
+            }
+            if (!calendarState[dateKey]) calendarState[dateKey] = { names: [], disabled: false };
+            if (calendarState[dateKey].disabled) return;
+            if (raList.length > 0) {
+              const name = raList[raIndex];
+              calendarState[dateKey].names.push(name);
+              saveHistory(dateKey, name);
+              raIndex = (raIndex + 1) % raList.length;
+              renderCalendar();
+            }
           });
         }
-
-        dayDiv.textContent = day;
-        dayDiv.appendChild(overlay);
-        daysDiv.appendChild(dayDiv);
+        daysDiv.appendChild(d);
       }
 
-      monthDiv.appendChild(daysDiv);
-      return monthDiv;
+      div.appendChild(daysDiv);
+      return div;
     }
 
-    const topRow = document.getElementById("topRow");
-    const bottomRow = document.getElementById("bottomRow");
-    monthsToRender.forEach((m, i) => {
-      const cal = createCalendar(m);
-      if (i < 3) topRow.appendChild(cal);
-      else bottomRow.appendChild(cal);
+    document.addEventListener("keydown", function(e) {
+      if (e.ctrlKey && e.key === "z") undo();
+      else if (e.ctrlKey && e.key === "y") redo();
     });
 
-    // Dropdown menu actions
     document.getElementById("actionsDropdown").addEventListener("change", function () {
-      if (this.value === "clear") {
-        const confirmClear = confirm("Are you sure you want to clear all slashes and Xs from the calendar?");
-        if (confirmClear) {
+      const val = this.value;
+      if (val === "clear") {
+        if (confirm("Clear all entries?")) {
           calendarState = {};
-          localStorage.removeItem(stateKey);
-          location.reload();
-        } else {
-          this.value = "Options";
+          raIndex = 0;
+          history = [];
+          redoStack = [];
+          renderCalendar();
         }
+      } else if (val === "reset") {
+        location.reload();
+      } else if (val === "export") {
+        if (!confirm("Finalize and export the calendar to Excel?")) return;
+        const wb = XLSX.utils.book_new();
+        const rows = [["Day", "Date", "RA #1", "RA #2"]];
+        for (const key in calendarState) {
+          const [y, m, d] = key.split("-");
+          const date = new Date(+y, +m - 1, +d);
+          const names = calendarState[key].names;
+          const day = date.toLocaleDateString("en-US", { weekday: 'short' });
+          rows.push([day, `${m}/${d}/${y}`, names[0] || "", names[1] || ""]);
+        }
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        XLSX.utils.book_append_sheet(wb, ws, "Duty Pick");
+        XLSX.writeFile(wb, "duty_pick_fall2025.xlsx");
       }
+      this.value = "Options";
     });
   </script>
 </body>

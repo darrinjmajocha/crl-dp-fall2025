@@ -4,14 +4,13 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RIT CRL Fall 2025 Duty Pick</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     body {
       font-family: Arial, sans-serif;
       background: #f0f0f0;
       margin: 0;
       padding: 20px;
-      transform: scale(0.93);
+      transform: scale(0.95);
       transform-origin: top center;
     }
     header {
@@ -22,6 +21,10 @@
     }
     h1 {
       margin: 0;
+    }
+    #nextName {
+      font-size: 16px;
+      font-weight: bold;
     }
     select {
       font-size: 16px;
@@ -63,25 +66,27 @@
     .day {
       background: white;
       border: 1px solid #aaa;
-      width: 85px;
-      height: 85px;
+      width: 70px;
+      height: 70px;
       position: relative;
-      font-size: 22px;
+      font-size: 20px;
       display: flex;
-      align-items: flex-start;
-      justify-content: flex-start;
-      padding: 5px;
-      box-sizing: border-box;
-      cursor: pointer;
       flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      cursor: pointer;
     }
     .overlay {
       position: absolute;
-      font-size: 115px;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 70px;
       font-weight: bold;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
       pointer-events: none;
     }
     .overlay.slash {
@@ -90,94 +95,107 @@
     .overlay.x {
       color: rgba(255, 85, 85, 0.4);
     }
+    .name-label {
+      font-size: 11px;
+      color: #333;
+      text-align: center;
+      z-index: 1;
+    }
     .weekend {
       background-color: rgba(0, 128, 0, 0.1);
     }
     .disabled {
       background-color: #ccc !important;
-      color: #888;
+      color: #888 !important;
     }
-    .ra-name {
-      font-size: 12px;
-      margin-top: auto;
-      align-self: center;
-      z-index: 2;
-      text-align: center;
-      white-space: pre-line;
-    }
-    #raInputScreen {
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-      max-width: 600px;
-      margin: auto;
+    #raInputArea {
+      margin-bottom: 20px;
     }
     textarea {
       width: 100%;
-      height: 300px;
+      height: 200px;
+      font-family: monospace;
     }
-    #nextUp {
-      font-weight: bold;
-      font-size: 16px;
+    button {
+      margin-top: 10px;
+      padding: 5px 15px;
     }
   </style>
 </head>
 <body>
-  <!-- unchanged HTML structure -->
+  <div id="raInputArea">
+    <h2>Enter RA Names (First Last, one per line)</h2>
+    <textarea id="raList"></textarea>
+    <br />
+    <button onclick="startCalendar()">Start Duty Pick</button>
+  </div>
+
+  <header style="display:none">
+    <h1>RIT CRL Fall 2025 Duty Pick</h1>
+    <div id="nextName">Next Selection: </div>
+    <select id="actionsDropdown">
+      <option disabled selected>Options</option>
+      <option value="reset">Reset Calendar</option>
+      <option value="export">Export to Excel</option>
+    </select>
+  </header>
+
+  <div class="calendar-grid" id="topRow" style="display:none"></div>
+  <div class="row-two" id="bottomRow" style="display:none"></div>
+
   <script>
-    // existing unchanged JavaScript...
+    const monthsToRender = [8, 9, 10, 11, 12];
+    const year = 2025;
+    const states = ["", "/", "X"];
+    let raList = JSON.parse(localStorage.getItem("raList")) || [];
+    let raIndex = parseInt(localStorage.getItem("raIndex")) || 0;
+    let history = [];
 
-    function renderCalendar() {
-      document.getElementById("topRow").innerHTML = "";
-      document.getElementById("bottomRow").innerHTML = "";
-      document.getElementById("nextUp").innerText = `Next Selection: ${raList[raIndex] || ""}`;
-      monthsToRender.forEach((month, i) => {
-        const cal = createCalendar(month);
-        if (i < 3) document.getElementById("topRow").appendChild(cal);
-        else document.getElementById("bottomRow").appendChild(cal);
-      });
-    }
-
-    function createCalendar(month) {
-      // existing code up until inside the for-loop per date
-        // inside for-loop for each date cell
-        const firstName = calendarState[dateKey].names[0]?.split(" ")[0] || "";
-        const secondName = calendarState[dateKey].names[1]?.split(" ")[0] || "";
-        nameDisplay.innerText = secondName ? `${firstName}\n${secondName}` : firstName;
-
-    // Update click event to toggle overlay
-        const prevOverlay = calendarState[dateKey].overlay;
-        const overlayType = prevOverlay === "" ? "/" : prevOverlay === "/" ? "X" : "";
-        if (overlayType !== "") {
-          const name = raList[raIndex];
-          if (overlayType === "/") {
-            calendarState[dateKey].names = [name];
-          } else if (overlayType === "X") {
-            calendarState[dateKey].names.push(name);
-          }
-          saveHistory(dateKey, name, overlayType, prevOverlay);
-          raIndex = (raIndex + 1) % raList.length;
+    document.getElementById("actionsDropdown").addEventListener("change", function () {
+      if (this.value === "reset") {
+        if (confirm("Are you sure you want to reset the calendar? This will erase all progress.")) {
+          localStorage.clear();
+          location.reload();
         } else {
-          calendarState[dateKey].names = [];
+          this.value = "reset";
         }
-    // end click handler
-
-    function undo() {
-      const last = history.pop();
-      if (!last) return;
-      const entry = calendarState[last.dateKey];
-      if (!entry) return;
-      const previousOverlay = last.previousOverlay;
-      if (previousOverlay === "/") {
-        entry.overlay = "/";
-        entry.names = [last.name];
-      } else if (previousOverlay === "") {
-        entry.overlay = "";
-        entry.names = [];
+      } else if (this.value === "export") {
+        exportCalendar();
+        this.value = "export";
       }
-      raIndex = (raIndex - 1 + raList.length) % raList.length;
-      redoStack.push(last);
-      renderCalendar();
+    });
+
+    function exportCalendar() {
+      const rows = [["Day of the Week", "Date", "RA Duty #1", "RA Duty #2"]];
+      const days = document.querySelectorAll(".day");
+      days.forEach(day => {
+        const dayNum = day.childNodes[0]?.nodeValue?.trim();
+        if (!dayNum || day.classList.contains("disabled")) return;
+        const overlay = day.querySelector(".overlay");
+        const label = day.querySelector(".name-label");
+        const state = overlay.dataset.state;
+        if (!state) return;
+
+        const date = new Date(year, parseInt(day.closest(".month").querySelector(".month-title").textContent.split(" ")[0], 10) - 1, parseInt(dayNum));
+        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
+        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+        const slashName = overlay.dataset.slashName || "";
+        const xName = overlay.dataset.xName || "";
+        const raFull1 = raList.find(r => r.first === slashName)?.full || slashName;
+        const raFull2 = raList.find(r => r.first === xName)?.full || xName;
+
+        rows.push([dayOfWeek, dateStr, raFull1, raFull2]);
+      });
+
+      const csvContent = rows.map(e => e.map(v => `"${v}"`).join(",")).join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = "duty_schedule_fall2025.csv";
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   </script>
 </body>

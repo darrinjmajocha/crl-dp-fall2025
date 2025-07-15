@@ -136,7 +136,6 @@
     <select id="actionsDropdown">
       <option disabled selected>Options</option>
       <option value="reset">Reset Calendar</option>
-      <option value="export">Export to Excel</option>
     </select>
   </header>
 
@@ -159,43 +158,159 @@
         } else {
           this.value = "reset";
         }
-      } else if (this.value === "export") {
-        exportCalendar();
-        this.value = "export";
       }
     });
 
-    function exportCalendar() {
-      const rows = [["Day of the Week", "Date", "RA Duty #1", "RA Duty #2"]];
-      const days = document.querySelectorAll(".day");
-      days.forEach(day => {
-        const dayNum = day.childNodes[0]?.nodeValue?.trim();
-        if (!dayNum || day.classList.contains("disabled")) return;
-        const overlay = day.querySelector(".overlay");
-        const label = day.querySelector(".name-label");
-        const state = overlay.dataset.state;
-        if (!state) return;
+    document.addEventListener("keydown", e => {
+      if (e.ctrlKey && e.key === "z") {
+        const last = history.pop();
+        if (last) {
+          const { overlay, label, prev, nextIndex, locked, cell } = last;
+          overlay.dataset.state = prev;
+          overlay.textContent = prev;
+          overlay.className = "overlay";
+          if (prev === "/") overlay.classList.add("slash");
+          else if (prev === "X") overlay.classList.add("x");
+          label.innerHTML = prev === "/" ? overlay.dataset.slashName : prev === "X" ? ${overlay.dataset.slashName}<br>${overlay.dataset.xName} : "";
+          raIndex = nextIndex;
+          updateNextName();
+          cell.dataset.locked = locked;
+        }
+      }
+    });
 
-        const date = new Date(year, parseInt(day.closest(".month").querySelector(".month-title").textContent.split(" ")[0], 10) - 1, parseInt(dayNum));
-        const dayOfWeek = date.toLocaleDateString('en-US', { weekday: 'short' });
-        const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-
-        const slashName = overlay.dataset.slashName || "";
-        const xName = overlay.dataset.xName || "";
-        const raFull1 = raList.find(r => r.first === slashName)?.full || slashName;
-        const raFull2 = raList.find(r => r.first === xName)?.full || xName;
-
-        rows.push([dayOfWeek, dateStr, raFull1, raFull2]);
+    function startCalendar() {
+      const raw = document.getElementById("raList").value.trim().split("\n").slice(0, 40);
+      raList = raw.map(line => {
+        const parts = line.trim().split(" ");
+        return { full: line.trim(), first: parts[0] || "" };
       });
+      raIndex = 0;
+      localStorage.setItem("raList", JSON.stringify(raList));
+      localStorage.setItem("raIndex", raIndex);
 
-      const csvContent = rows.map(e => e.map(v => `"${v}"`).join(",")).join("\n");
-      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-      const link = document.createElement("a");
-      link.href = URL.createObjectURL(blob);
-      link.download = "duty_schedule_fall2025.csv";
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      document.getElementById("raInputArea").style.display = "none";
+      document.querySelector("header").style.display = "flex";
+      document.getElementById("topRow").style.display = "grid";
+      document.getElementById("bottomRow").style.display = "flex";
+
+      renderCalendars();
+    }
+
+    function renderCalendars() {
+      const topRow = document.getElementById("topRow");
+      const bottomRow = document.getElementById("bottomRow");
+      topRow.innerHTML = "";
+      bottomRow.innerHTML = "";
+      monthsToRender.forEach((m, i) => {
+        const cal = createCalendar(m);
+        if (i < 3) topRow.appendChild(cal);
+        else bottomRow.appendChild(cal);
+      });
+      updateNextName();
+    }
+
+    function updateNextName() {
+      const next = raList[raIndex % raList.length]?.full || "N/A";
+      document.getElementById("nextName").textContent = Next Selection: ${next};
+      localStorage.setItem("raIndex", raIndex);
+    }
+
+    function createCalendar(month) {
+      const monthDiv = document.createElement("div");
+      monthDiv.className = "month";
+      const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
+      monthDiv.innerHTML = <div class="month-title">${monthName} ${year}</div>;
+
+      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+      const dayNamesDiv = document.createElement("div");
+      dayNamesDiv.className = "day-names";
+      dayNames.forEach(d => {
+        const dn = document.createElement("div");
+        dn.textContent = d;
+        dayNamesDiv.appendChild(dn);
+      });
+      monthDiv.appendChild(dayNamesDiv);
+
+      const daysDiv = document.createElement("div");
+      daysDiv.className = "days";
+
+      const firstDay = new Date(year, month - 1, 1).getDay();
+      const numDays = new Date(year, month, 0).getDate();
+
+      for (let i = 0; i < firstDay; i++) {
+        const emptyCell = document.createElement("div");
+        emptyCell.className = "day";
+        daysDiv.appendChild(emptyCell);
+      }
+
+      for (let day = 1; day <= numDays; day++) {
+        const weekday = new Date(year, month - 1, day).getDay();
+        const dayDiv = document.createElement("div");
+        dayDiv.className = "day";
+        if ((weekday === 5 || weekday === 6) || (month === 8 && day === 31)) {
+          dayDiv.classList.add("weekend");
+        }
+
+        const overlay = document.createElement("div");
+        overlay.className = "overlay";
+        const label = document.createElement("div");
+        label.className = "name-label";
+        overlay.dataset.state = "";
+        overlay.dataset.slashName = "";
+        overlay.dataset.xName = "";
+
+        overlay.textContent = "";
+        dayDiv.innerHTML = ${day};
+        dayDiv.appendChild(overlay);
+        dayDiv.appendChild(label);
+
+        dayDiv.dataset.locked = "false";
+
+        dayDiv.addEventListener("click", (e) => {
+          if (e.ctrlKey) {
+            dayDiv.classList.toggle("disabled");
+            return;
+          }
+
+          if (dayDiv.classList.contains("disabled") || dayDiv.dataset.locked === "true") return;
+
+          const current = overlay.dataset.state;
+          const nextIndex = (states.indexOf(current) + 1) % states.length;
+          const next = states[nextIndex];
+
+          history.push({ overlay, label, prev: current, nextIndex: raIndex, locked: dayDiv.dataset.locked, cell: dayDiv });
+
+          overlay.dataset.state = next;
+          overlay.textContent = next;
+          overlay.className = "overlay";
+
+          if (next === "/") {
+            overlay.classList.add("slash");
+            overlay.dataset.slashName = raList[raIndex % raList.length]?.first || "";
+            label.innerHTML = ${overlay.dataset.slashName};
+            raIndex++;
+          } else if (next === "X") {
+            overlay.classList.add("x");
+            overlay.dataset.xName = raList[raIndex % raList.length]?.first || "";
+            label.innerHTML = ${overlay.dataset.slashName}<br>${overlay.dataset.xName};
+            raIndex++;
+            dayDiv.dataset.locked = "true";
+          } else {
+            overlay.dataset.slashName = "";
+            overlay.dataset.xName = "";
+            label.innerHTML = "";
+            dayDiv.dataset.locked = "false";
+          }
+
+          updateNextName();
+        });
+
+        daysDiv.appendChild(dayDiv);
+      }
+
+      monthDiv.appendChild(daysDiv);
+      return monthDiv;
     }
   </script>
 </body>

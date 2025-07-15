@@ -80,16 +80,22 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
+      overflow: hidden;
     }
 
     .overlay {
       position: absolute;
-      font-size: 65px;
+      width: 100%;
+      height: 100%;
+      font-size: 80px;
       font-weight: bold;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
+      top: 0;
+      left: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
       pointer-events: none;
+      transform: rotate(45deg);
     }
 
     .overlay.slash {
@@ -200,14 +206,26 @@
         else if (saved === "X") overlay.classList.add("x");
 
         if (isActive) {
-          dayDiv.addEventListener("click", () => {
+          dayDiv.addEventListener("click", (event) => {
             const currentState = calendarState[dateKey] || "";
-            const nextState = states[(states.indexOf(currentState) + 1) % states.length];
+            const currentIndex = states.indexOf(currentState);
+            let nextIndex;
+
+            // Allow clearing only if Ctrl is held
+            if ((currentState === "/" || currentState === "X") && !event.ctrlKey) {
+              nextIndex = currentIndex === 2 ? 2 : currentIndex + 1;
+            } else {
+              nextIndex = (currentIndex + 1) % states.length;
+            }
+
+            const nextState = states[nextIndex];
             calendarState[dateKey] = nextState;
+
             overlay.textContent = nextState;
             overlay.className = "overlay";
             if (nextState === "/") overlay.classList.add("slash");
             else if (nextState === "X") overlay.classList.add("x");
+
             saveState();
           });
         }

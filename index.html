@@ -77,7 +77,7 @@
     }
     .overlay {
       position: absolute;
-      font-size: 85px;
+      font-size: 115px;
       font-weight: bold;
       top: 50%;
       left: 50%;
@@ -85,23 +85,23 @@
       pointer-events: none;
     }
     .overlay.slash {
-      color: rgba(85, 85, 255, 0.3);
+      color: rgba(85, 85, 255, 0.4);
     }
     .overlay.x {
-      color: rgba(255, 85, 85, 0.3);
+      color: rgba(255, 85, 85, 0.4);
     }
     .weekend {
       background-color: rgba(0, 128, 0, 0.1);
     }
     .disabled {
-      background-color: #ccc;
-      pointer-events: none;
+      background-color: #ccc !important;
       color: #888;
     }
     .ra-name {
       font-size: 12px;
       margin-top: auto;
       align-self: center;
+      z-index: 2;
     }
     #raInputScreen {
       display: flex;
@@ -145,22 +145,25 @@
   <script>
     const monthsToRender = [8, 9, 10, 11, 12];
     const year = 2025;
-    let calendarState = {};  // format: { "2025-08-16": { names: ["RA Name"], disabled: false } }
+    let calendarState = {};
     let raList = [];
     let raIndex = 0;
     let history = [];
     let redoStack = [];
 
-    function saveHistory(dateKey, name) {
-      history.push({ dateKey, name });
+    function saveHistory(dateKey, name, overlayType) {
+      history.push({ dateKey, name, overlayType });
       redoStack = [];
     }
 
     function undo() {
       const last = history.pop();
       if (!last) return;
-      if (calendarState[last.dateKey]) {
-        calendarState[last.dateKey].names.pop();
+      const entry = calendarState[last.dateKey];
+      if (entry) {
+        entry.names.pop();
+        entry.overlay = "";
+        raIndex = (raIndex - 1 + raList.length) % raList.length;
         redoStack.push(last);
         renderCalendar();
       }
@@ -169,11 +172,12 @@
     function redo() {
       const last = redoStack.pop();
       if (!last) return;
-      if (calendarState[last.dateKey]) {
-        calendarState[last.dateKey].names.push(last.name);
-        history.push(last);
-        renderCalendar();
-      }
+      if (!calendarState[last.dateKey]) calendarState[last.dateKey] = { names: [], disabled: false, overlay: "" };
+      calendarState[last.dateKey].names.push(last.name);
+      calendarState[last.dateKey].overlay = last.overlayType;
+      raIndex = (raIndex + 1) % raList.length;
+      history.push(last);
+      renderCalendar();
     }
 
     function startCalendar() {
@@ -189,7 +193,6 @@
       document.getElementById("topRow").innerHTML = "";
       document.getElementById("bottomRow").innerHTML = "";
       document.getElementById("nextUp").innerText = `Next Selection: ${raList[raIndex] || ""}`;
-
       monthsToRender.forEach((month, i) => {
         const cal = createCalendar(month);
         if (i < 3) document.getElementById("topRow").appendChild(cal);
@@ -214,16 +217,13 @@
       const div = document.createElement("div");
       div.className = "month";
       div.innerHTML = `<div class='month-title'>${new Date(year, month-1).toLocaleString('default', {month:'long'})} ${year}</div>`;
-
       const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
       const daysHeader = document.createElement("div");
       daysHeader.className = "day-names";
       dayNames.forEach(d => daysHeader.innerHTML += `<div>${d}</div>`);
       div.appendChild(daysHeader);
-
       const daysDiv = document.createElement("div");
       daysDiv.className = "days";
-
       const firstDay = new Date(year, month - 1, 1).getDay();
       const numDays = new Date(year, month, 0).getDate();
       for (let i = 0; i < firstDay; i++) daysDiv.appendChild(document.createElement("div"));
@@ -234,28 +234,36 @@
         const d = document.createElement("div");
         d.className = "day";
         if ((weekday === 5 || weekday === 6) || (month === 8 && day === 31)) d.classList.add("weekend");
-        if (!isWithinRange(month, day) || isBlackoutDate(month, day)) d.classList.add("disabled");
+        if (!calendarState[dateKey]) calendarState[dateKey] = { names: [], disabled: !isWithinRange(month, day) || isBlackoutDate(month, day), overlay: "" };
+        if (calendarState[dateKey].disabled) d.classList.add("disabled");
 
-        d.innerHTML = `${day}<div class='ra-name'>${(calendarState[dateKey]?.names || []).join(", ")}</div>`;
+        d.innerHTML = `${day}<div class='ra-name'>${calendarState[dateKey].names[0] || ""}</div>`;
 
-        if (!d.classList.contains("disabled")) {
-          d.addEventListener("click", e => {
-            if (e.ctrlKey) {
-              calendarState[dateKey] = { names: [], disabled: true };
-              renderCalendar();
-              return;
-            }
-            if (!calendarState[dateKey]) calendarState[dateKey] = { names: [], disabled: false };
-            if (calendarState[dateKey].disabled) return;
-            if (raList.length > 0) {
-              const name = raList[raIndex];
-              calendarState[dateKey].names.push(name);
-              saveHistory(dateKey, name);
-              raIndex = (raIndex + 1) % raList.length;
-              renderCalendar();
-            }
-          });
-        }
+        const overlay = document.createElement("div");
+        overlay.className = "overlay";
+        if (calendarState[dateKey].overlay === "/") overlay.classList.add("slash");
+        if (calendarState[dateKey].overlay === "X") overlay.classList.add("x");
+        overlay.textContent = calendarState[dateKey].overlay || "";
+        d.appendChild(overlay);
+
+        d.addEventListener("click", e => {
+          if (e.ctrlKey) {
+            calendarState[dateKey].disabled = !calendarState[dateKey].disabled;
+            renderCalendar();
+            return;
+          }
+          if (calendarState[dateKey].disabled) return;
+          const overlayType = calendarState[dateKey].overlay === "" ? "/" : calendarState[dateKey].overlay === "/" ? "X" : "";
+          calendarState[dateKey].overlay = overlayType;
+          if (overlayType !== "" && raList.length > 0) {
+            const name = raList[raIndex];
+            calendarState[dateKey].names = [name];
+            saveHistory(dateKey, name, overlayType);
+            raIndex = (raIndex + 1) % raList.length;
+          }
+          renderCalendar();
+        });
+
         daysDiv.appendChild(d);
       }
 

@@ -141,7 +141,8 @@
     }
 
     .unclickable {
-      pointer-events: none;
+      /* Allow clicks so Gray Out mode can toggle; normal mode guards in JS */
+      pointer-events: auto;
     }
 
     .mode-indicator {

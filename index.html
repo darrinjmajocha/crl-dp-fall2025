@@ -5,158 +5,68 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>RIT CRL Duty Pick</title>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: #f0f0f0;
-      margin: 0;
-      padding: 20px;
-      transform: scale(0.95);
-      transform-origin: top center;
+    /* ============================================================
+       THEME & QUICK-TWEAK VARIABLES (change these first)
+       ------------------------------------------------------------
+       - --day-font-size: number font in each date cell
+       - --overlay-alpha: opacity for / and X marks (0 → 1)
+       - --day-size: width/height of each date cell
+       - --weekend-alpha: intensity of green weekend fill
+       - --min-month-width: keeps month boxes consistent even blank
+       ============================================================ */
+    :root{
+      --day-font-size: 26px;     /* <- bump to make day numbers bigger */
+      --overlay-alpha: .62;      /* <- lower = more transparent marks */
+      --day-size: 70px;          /* <- adjusts cell size (width/height) */
+      --weekend-alpha: .12;      /* <- weekend fill intensity */
+      --min-month-width: 520px;  /* <- layout stability on blank state */
     }
 
-    header {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 20px;
-      flex-wrap: wrap;
-    }
+    /* ===== Base layout ===== */
+    body{font-family:Arial,sans-serif;background:#f0f0f0;margin:0;padding:20px;transform:scale(.95);transform-origin:top center}
+    header{display:flex;gap:16px;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap}
+    .left-head,.right-head{display:flex;align-items:center;gap:12px}
+    h1{margin:0;font-size:22px}
+    .hint{font-size:12px;color:#666}
+    select{font-size:16px;padding:5px 10px}
 
-    .left-head, .right-head {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+    /* ===== Calendar grid ===== */
+    .calendar-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;justify-items:center}
+    .row-two{display:flex;gap:20px;justify-content:center;margin-top:20px}
 
-    h1 {
-      margin: 0;
-      font-size: 22px;
-    }
+    /* ===== Month card ===== */
+    .month{background:#fff;border:2px solid #333;padding:10px;min-width:var(--min-month-width)}
+    .month-title{font-size:20px;font-weight:700;text-align:center;margin-bottom:10px;min-height:24px}
+    .day-names,.days{display:grid;grid-template-columns:repeat(7,1fr);text-align:center}
+    .day-names div{font-weight:700;background:#ddd;padding:5px}
 
-    .hint {
-      font-size: 12px;
-      color: #666;
-    }
+    /* ===== Day cell ===== */
+    .day{background:#fff;border:1px solid #aaa;width:var(--day-size);height:var(--day-size);position:relative;font-size:var(--day-font-size);display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;user-select:none}
+    .day.blank{cursor:default;background:#fafafa}
 
-    select {
-      font-size: 16px;
-      padding: 5px 10px;
-    }
+    /* ===== Slash/X overlay ===== */
+    .overlay{position:absolute;width:100%;height:100%;font-size:86px;font-weight:900;top:0;left:0;display:flex;align-items:center;justify-content:center;pointer-events:none;transform:rotate(45deg);line-height:1}
+    .overlay.slash{color:rgba(60,60,255,var(--overlay-alpha));text-shadow:0 0 2px rgba(0,0,0,.12)}
+    .overlay.x{color:rgba(255,40,40,var(--overlay-alpha));text-shadow:0 0 2px rgba(0,0,0,.12)}
 
-    .calendar-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 20px;
-      justify-items: center;
-    }
+    /* ===== Weekend & gray states ===== */
+    .weekend{background-color:rgba(0,128,0,var(--weekend-alpha))}
+    .grayout{background-color:#cfcfcf !important;color:#777}
 
-    .row-two {
-      display: flex;
-      gap: 20px;
-      justify-content: center;
-      margin-top: 20px;
-    }
+    /* Allow clicks so Gray Out mode can toggle back to normal.  
+       Normal mode still blocks mark-cycling in JS. */
+    .unclickable{pointer-events:auto}
 
-    .month {
-      background: #fff;
-      border: 2px solid #333;
-      padding: 10px;
-      min-width: 520px; /* ensures stable layout even when blank */
-    }
-
-    .month-title {
-      font-size: 20px;
-      font-weight: bold;
-      text-align: center;
-      margin-bottom: 10px;
-      min-height: 24px;
-    }
-
-    .day-names, .days {
-      display: grid;
-      grid-template-columns: repeat(7, 1fr);
-      text-align: center;
-    }
-
-    .day-names div {
-      font-weight: bold;
-      background: #ddd;
-      padding: 5px;
-    }
-
-    .day {
-      background: white;
-      border: 1px solid #aaa;
-      width: 70px;
-      height: 70px;
-      position: relative;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      overflow: hidden;
-      user-select: none;
-    }
-
-    .day.blank { /* empty spacer cells before day 1 */
-      cursor: default;
-      background: #fafafa;
-    }
-
-    .overlay {
-      position: absolute;
-      width: 100%;
-      height: 100%;
-      font-size: 86px; /* a touch larger */
-      font-weight: 900; /* bolder */
-      top: 0;
-      left: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      pointer-events: none;
-      transform: rotate(45deg);
-      line-height: 1;
-    }
-
-    .overlay.slash {
-      color: rgba(60, 60, 255, 0.78); /* less transparent */
-      text-shadow: 0 0 2px rgba(0,0,0,0.15);
-    }
-
-    .overlay.x {
-      color: rgba(255, 40, 40, 0.78); /* less transparent */
-      text-shadow: 0 0 2px rgba(0,0,0,0.15);
-    }
-
-    .weekend {
-      background-color: rgba(0, 128, 0, 0.12);
-    }
-
-    .grayout {
-      background-color: #cfcfcf !important;
-      color: #777;
-    }
-
-    .unclickable {
-      /* Allow clicks so Gray Out mode can toggle; normal mode guards in JS */
-      pointer-events: auto;
-    }
-
-    .mode-indicator {
-      font-size: 12px;
-      padding: 2px 8px;
-      border-radius: 999px;
-      background: #eee;
-      border: 1px solid #ccc;
-      color: #333;
-    }
+    .mode-indicator{font-size:12px;padding:2px 8px;border-radius:999px;background:#eee;border:1px solid #ccc;color:#333}
   </style>
 </head>
 <body>
 
+  <!-- ============================================================
+       HEADER CONTROLS
+       - Semester picker populates blank calendars
+       - Options menu hosts the two toggle modes + clear marks
+       ============================================================ -->
   <header>
     <div class="left-head">
       <h1 id="pageTitle">RIT CRL Duty Pick</h1>
@@ -166,7 +76,6 @@
       <label for="semesterSelect" class="hint">Choose semester:</label>
       <select id="semesterSelect">
         <option selected disabled>— Select Semester —</option>
-        <!-- options inserted by JS -->
       </select>
 
       <select id="actionsDropdown">
@@ -178,285 +87,258 @@
     </div>
   </header>
 
+  <!-- Five calendars: three on top row, two on bottom -->
   <div class="calendar-grid" id="topRow"></div>
   <div class="row-two" id="bottomRow"></div>
 
   <script>
-    /************** CONFIG **************/
-    const FUTURE_SEMESTER_COUNT = 12; // Spring 2026 through Fall 2031 (12 semesters)
-    const STATE_KEYS = {
-      marks: "duty_calendar_marks",          // { "YYYY-MM-DD": "", "/", "X" }
-      weekendOverrides: "duty_calendar_weekend_overrides", // { "YYYY-MM-DD": true }
-      grayouts: "duty_calendar_grayouts"     // { "YYYY-MM-DD": true }
-    };
+  /* ==============================================================
+     CONFIG (futureproof knobs)
+     - START_YEAR: first Spring shown in semester list
+     - FUTURE_SEMESTER_COUNT: how many semesters to list (Spring, Fall alternating)
+     - STATE_KEYS: localStorage keys (safe to change names if needed)
+     ==============================================================
+  */
+  const START_YEAR = 2026;               // <- change to shift starting Spring
+  const FUTURE_SEMESTER_COUNT = 19;      // <- increase to extend the dropdown
+  const STATE_KEYS = {
+    marks: 'duty_calendar_marks',               // stores "/" and "X" marks
+    weekendOverrides: 'duty_calendar_weekend_overrides', // user-made green days
+    grayouts: 'duty_calendar_grayouts'          // non-pickable gray days
+  };
 
-    const states = ["", "/", "X"]; // click cycles; hold Ctrl to clear
+  // Mark cycle: click to cycle; hold Ctrl while clicking to clear
+  const states = ['', '/', 'X'];
 
-    /************** STORAGE **************/
-    let markState = JSON.parse(localStorage.getItem(STATE_KEYS.marks) || "{}");
-    let weekendOverrides = JSON.parse(localStorage.getItem(STATE_KEYS.weekendOverrides) || "{}");
-    let grayouts = JSON.parse(localStorage.getItem(STATE_KEYS.grayouts) || "{}");
+  /* ==============================================================
+     STATE (persistent via localStorage)
+     ==============================================================
+  */
+  let markState = JSON.parse(localStorage.getItem(STATE_KEYS.marks) || '{}');
+  let weekendOverrides = JSON.parse(localStorage.getItem(STATE_KEYS.weekendOverrides) || '{}');
+  let grayouts = JSON.parse(localStorage.getItem(STATE_KEYS.grayouts) || '{}');
 
-    function saveMarks()   { localStorage.setItem(STATE_KEYS.marks, JSON.stringify(markState)); }
-    function saveWends()   { localStorage.setItem(STATE_KEYS.weekendOverrides, JSON.stringify(weekendOverrides)); }
-    function saveGrayouts(){ localStorage.setItem(STATE_KEYS.grayouts, JSON.stringify(grayouts)); }
+  const saveMarks    = () => localStorage.setItem(STATE_KEYS.marks, JSON.stringify(markState));
+  const saveWends    = () => localStorage.setItem(STATE_KEYS.weekendOverrides, JSON.stringify(weekendOverrides));
+  const saveGrayouts = () => localStorage.setItem(STATE_KEYS.grayouts, JSON.stringify(grayouts));
 
-    /************** SEMESTERS **************/
-    function generateSemesters(startYear = 2026, count = FUTURE_SEMESTER_COUNT) {
-      const out = [];
-      let year = startYear;
-      let isSpring = true; // start Spring startYear
+  /* ==============================================================
+     SEMESTER HELPERS
+     - generateSemesters: builds Spring/Fall labels (e.g., "Spring 2026")
+     - semesterMonths: returns months to render for a label
+     ==============================================================
+  */
+  function generateSemesters(startYear = START_YEAR, count = FUTURE_SEMESTER_COUNT){
+    const out = [];
+    let year = startYear, spring = true;
+    for(let i=0;i<count;i++){
+      out.push(`${spring ? 'Spring' : 'Fall'} ${year}`);
+      if(!spring) year++;  // after Fall, increment year
+      spring = !spring;
+    }
+    return out;
+  }
+  function semesterMonths(label){
+    const [season, y] = label.split(' ');
+    const year = parseInt(y, 10);
+    return season === 'Spring' ? {year, months:[1,2,3,4,5]} : {year, months:[8,9,10,11,12]};
+  }
 
-      for (let i = 0; i < count; i++) {
-        const label = (isSpring ? "Spring " : "Fall ") + year;
-        out.push(label);
-        if (!isSpring) year++; // after Fall, move to next year
-        isSpring = !isSpring;
-      }
-      return out;
+  /* ==============================================================
+     DOM REFS & MODE
+     - mode values: 'normal' | 'addWeekends' | 'grayOut'
+     ==============================================================
+  */
+  const topRow = document.getElementById('topRow');
+  const bottomRow = document.getElementById('bottomRow');
+  const pageTitle = document.getElementById('pageTitle');
+  const modeIndicator = document.getElementById('modeIndicator');
+  const actionsDropdown = document.getElementById('actionsDropdown');
+  const semesterSelect = document.getElementById('semesterSelect');
+
+  let mode = 'normal';
+  let currentSemester = null;
+
+  function setMode(newMode){
+    mode = newMode;
+    if(mode === 'normal'){
+      modeIndicator.style.display = 'none';
+    }else{
+      modeIndicator.style.display = 'inline-block';
+      modeIndicator.textContent = mode === 'addWeekends'
+        ? 'Mode: Add Weekends (click to toggle green). Press Esc to exit.'
+        : 'Mode: Gray Out (click to toggle gray). Press Esc to exit.';
+    }
+  }
+
+  /* ==============================================================
+     RENDER HELPERS
+     - renderBlankFive: shows 5 empty months before a semester is chosen
+     - createMonth: builds a month element and wires click behaviors
+     - renderSemester: lays out 5 months for the chosen semester
+     ==============================================================
+  */
+  function renderBlankFive(){
+    topRow.innerHTML = '';
+    bottomRow.innerHTML = '';
+    const blankDays = Array.from({length:42}).map(()=>'<div class="day blank"></div>').join('');
+    for(let i=0;i<5;i++){
+      const m = document.createElement('div');
+      m.className = 'month';
+      m.innerHTML = `
+        <div class="month-title">—</div>
+        <div class="day-names">
+          <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+        <div class="days">${blankDays}</div>
+      `;
+      (i<3?topRow:bottomRow).appendChild(m);
+    }
+  }
+
+  function createMonth(year, month){
+    const wrap = document.createElement('div');
+    wrap.className = 'month';
+    wrap.innerHTML = `<div class="month-title">${new Date(year,month-1).toLocaleString('default',{month:'long'})} ${year}</div>`;
+
+    // Weekday header
+    const dayNamesDiv = document.createElement('div');
+    dayNamesDiv.className = 'day-names';
+    ;['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach(d=>{
+      const el = document.createElement('div');
+      el.textContent = d;dayNamesDiv.appendChild(el);
+    });
+    wrap.appendChild(dayNamesDiv);
+
+    // Days grid
+    const grid = document.createElement('div');
+    grid.className = 'days';
+
+    const firstDay = new Date(year, month-1, 1).getDay();
+    const numDays  = new Date(year, month, 0).getDate();
+
+    // leading blanks
+    for(let i=0;i<firstDay;i++){
+      const e = document.createElement('div');
+      e.className = 'day blank';
+      grid.appendChild(e);
     }
 
-    function semesterMonths(semesterLabel) {
-      // returns { year: YYYY, months: [..] }
-      const [season, yearStr] = semesterLabel.split(" ");
-      const year = parseInt(yearStr, 10);
-      if (season === "Spring") return { year, months: [1,2,3,4,5] };
-      // Fall is always Aug-Dec of given year
-      return { year, months: [8,9,10,11,12] };
-    }
+    for(let day=1; day<=numDays; day++){
+      const dateKey = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const weekday = new Date(year, month-1, day).getDay();
 
-    /************** RENDER **************/
-    const topRow = document.getElementById("topRow");
-    const bottomRow = document.getElementById("bottomRow");
-    const pageTitle = document.getElementById("pageTitle");
-    const modeIndicator = document.getElementById("modeIndicator");
+      const cell = document.createElement('div');
+      cell.className = 'day';
+      cell.textContent = day;
 
-    // modes: "normal" | "addWeekends" | "grayOut"
-    let mode = "normal";
-    let currentSemester = null;
+      // Auto-weekend: Fri/Sat always green
+      if(weekday===5 || weekday===6) cell.classList.add('weekend');
+      // User-added weekend overrides
+      if(weekendOverrides[dateKey]) cell.classList.add('weekend');
+      // Grayouts (non-pickable in normal mode)
+      if(grayouts[dateKey]) cell.classList.add('grayout','unclickable');
 
-    function setMode(newMode) {
-      mode = newMode;
-      if (mode === "normal") {
-        modeIndicator.style.display = "none";
-      } else {
-        modeIndicator.style.display = "inline-block";
-        modeIndicator.textContent = mode === "addWeekends" ? "Mode: Add Weekends (click to toggle green). Press Esc to exit." :
-                                                          "Mode: Gray Out (click to toggle gray). Press Esc to exit.";
-      }
-    }
+      // Overlay mark (/ or X)
+      const overlay = document.createElement('div');
+      overlay.className = 'overlay';
+      const saved = markState[dateKey] || '';
+      overlay.textContent = saved;
+      if(saved === '/') overlay.classList.add('slash');
+      else if(saved === 'X') overlay.classList.add('x');
+      cell.appendChild(overlay);
 
-    // placeholder empty five calendars
-    function renderBlankFive() {
-      topRow.innerHTML = "";
-      bottomRow.innerHTML = "";
-      for (let i = 0; i < 5; i++) {
-        const m = document.createElement("div");
-        m.className = "month";
-        m.innerHTML = `
-          <div class="month-title">—</div>
-          <div class="day-names">
-            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-          </div>
-          <div class="days">${Array.from({length: 42}).map(()=>'<div class="day blank"></div>').join('')}</div>
-        `;
-        if (i < 3) topRow.appendChild(m);
-        else bottomRow.appendChild(m);
-      }
-    }
+      // Click logic varies by mode
+      cell.addEventListener('click', (ev)=>{
+        // GRAY OUT MODE: toggle gray regardless of unclickable
+        if(mode==='grayOut'){
+          const isGray = !!grayouts[dateKey];
+          if(isGray){ delete grayouts[dateKey]; cell.classList.remove('grayout','unclickable'); }
+          else      { grayouts[dateKey] = true; cell.classList.add('grayout','unclickable'); }
+          saveGrayouts();
+          return;
+        }
+        // ADD WEEKENDS MODE: toggle green class
+        if(mode==='addWeekends'){
+          if(weekendOverrides[dateKey]){
+            delete weekendOverrides[dateKey];
+            const natural = (weekday===5 || weekday===6);
+            if(!natural) cell.classList.remove('weekend');
+          }else{
+            weekendOverrides[dateKey] = true; cell.classList.add('weekend');
+          }
+          saveWends();
+          return;
+        }
+        // NORMAL MODE: block marks on gray cells
+        if(cell.classList.contains('unclickable')) return;
 
-    function createMonth(year, month) {
-      const monthDiv = document.createElement("div");
-      monthDiv.className = "month";
-      const monthName = new Date(year, month - 1).toLocaleString("default", { month: "long" });
-      monthDiv.innerHTML = `<div class="month-title">${monthName} ${year}</div>`;
-
-      const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-      const dayNamesDiv = document.createElement("div");
-      dayNamesDiv.className = "day-names";
-      dayNames.forEach(d => {
-        const dn = document.createElement("div");
-        dn.textContent = d;
-        dayNamesDiv.appendChild(dn);
+        const current = markState[dateKey] || '';
+        const idx = states.indexOf(current);
+        const nextIdx = (current && !ev.ctrlKey && idx===2) ? 2 : (idx+1)%states.length; // lock X unless Ctrl to clear on next loop
+        const next = states[nextIdx];
+        markState[dateKey] = next;
+        overlay.textContent = next;
+        overlay.className = 'overlay';
+        if(next === '/') overlay.classList.add('slash');
+        else if(next === 'X') overlay.classList.add('x');
+        saveMarks();
       });
-      monthDiv.appendChild(dayNamesDiv);
 
-      const daysDiv = document.createElement("div");
-      daysDiv.className = "days";
-
-      const firstDay = new Date(year, month - 1, 1).getDay();
-      const numDays = new Date(year, month, 0).getDate();
-
-      // leading blanks
-      for (let i = 0; i < firstDay; i++) {
-        const emptyCell = document.createElement("div");
-        emptyCell.className = "day blank";
-        daysDiv.appendChild(emptyCell);
-      }
-
-      for (let day = 1; day <= numDays; day++) {
-        const dateKey = `${year}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
-        const weekday = new Date(year, month - 1, day).getDay();
-        const dayDiv = document.createElement("div");
-        dayDiv.className = "day";
-        dayDiv.textContent = day;
-
-        // default weekends: Fri/Sat
-        if (weekday === 5 || weekday === 6) {
-          dayDiv.classList.add("weekend");
-        }
-
-        // weekend overrides (make any day green)
-        if (weekendOverrides[dateKey]) {
-          dayDiv.classList.add("weekend");
-        }
-
-        // grayouts (non-pickable unless in grayOut mode)
-        if (grayouts[dateKey]) {
-          dayDiv.classList.add("grayout", "unclickable");
-        }
-
-        // overlay mark
-        const overlay = document.createElement("div");
-        overlay.className = "overlay";
-        const saved = markState[dateKey] || "";
-        overlay.textContent = saved;
-        if (saved === "/") overlay.classList.add("slash");
-        else if (saved === "X") overlay.classList.add("x");
-        dayDiv.appendChild(overlay);
-
-        // click behavior depends on mode
-        dayDiv.addEventListener("click", (event) => {
-          // If in grayOut mode, allow toggling gray even if currently unclickable
-          if (mode === "grayOut") {
-            const isGray = !!grayouts[dateKey];
-            if (isGray) {
-              delete grayouts[dateKey];
-              dayDiv.classList.remove("grayout", "unclickable");
-            } else {
-              grayouts[dateKey] = true;
-              dayDiv.classList.add("grayout", "unclickable");
-            }
-            saveGrayouts();
-            return;
-          }
-
-          // If in addWeekends mode, toggle green
-          if (mode === "addWeekends") {
-            const isCustomWeekend = !!weekendOverrides[dateKey];
-            if (isCustomWeekend) {
-              delete weekendOverrides[dateKey];
-              // Recompute whether natural Fri/Sat should stay green
-              const natural = (weekday === 5 || weekday === 6);
-              if (!natural) dayDiv.classList.remove("weekend");
-            } else {
-              weekendOverrides[dateKey] = true;
-              dayDiv.classList.add("weekend");
-            }
-            saveWends();
-            return;
-          }
-
-          // Normal marking mode: do nothing if grayed-out
-          if (dayDiv.classList.contains("unclickable")) return;
-
-          const currentState = markState[dateKey] || "";
-          const currentIndex = states.indexOf(currentState);
-
-          let nextIndex;
-          if ((currentState === "/" || currentState === "X") && !event.ctrlKey) {
-            // Only allow clearing with Ctrl; otherwise advance until locked on X
-            nextIndex = currentIndex === 2 ? 2 : currentIndex + 1;
-          } else {
-            nextIndex = (currentIndex + 1) % states.length;
-          }
-
-          const nextState = states[nextIndex];
-          markState[dateKey] = nextState;
-
-          overlay.textContent = nextState;
-          overlay.className = "overlay";
-          if (nextState === "/") overlay.classList.add("slash");
-          else if (nextState === "X") overlay.classList.add("x");
-
-          saveMarks();
-        });
-
-        daysDiv.appendChild(dayDiv);
-      }
-
-      monthDiv.appendChild(daysDiv);
-      return monthDiv;
+      grid.appendChild(cell);
     }
 
-    function renderSemester(semesterLabel) {
-      const { year, months } = semesterMonths(semesterLabel);
-      topRow.innerHTML = "";
-      bottomRow.innerHTML = "";
-      months.forEach((m, i) => {
-        const cal = createMonth(year, m);
-        if (i < 3) topRow.appendChild(cal);
-        else bottomRow.appendChild(cal);
-      });
-      pageTitle.textContent = `RIT CRL Duty Pick — ${semesterLabel}`;
+    wrap.appendChild(grid);
+    return wrap;
+  }
+
+  function renderSemester(label){
+    const {year, months} = semesterMonths(label);
+    topRow.innerHTML = '';
+    bottomRow.innerHTML = '';
+    months.forEach((m,i)=>{ (i<3?topRow:bottomRow).appendChild(createMonth(year,m)); });
+    pageTitle.textContent = `RIT CRL Duty Pick — ${label}`;
+  }
+
+  /* ==============================================================
+     CONTROLS WIRING
+     - Populates semester dropdown
+     - Handles Options menu (modes + clear marks)
+     - ESC exits any special mode
+     ==============================================================
+  */
+  // Build semester list
+  generateSemesters(START_YEAR, FUTURE_SEMESTER_COUNT).forEach(lbl=>{
+    const opt = document.createElement('option');
+    opt.value = lbl; opt.textContent = lbl; semesterSelect.appendChild(opt);
+  });
+
+  semesterSelect.addEventListener('change', e=>{
+    currentSemester = e.target.value;
+    renderSemester(currentSemester);
+    setMode('normal');
+    actionsDropdown.value = 'Options';
+  });
+
+  actionsDropdown.addEventListener('change', function(){
+    const v = this.value;
+    if(v==='clear'){
+      if(confirm('Clear all slashes and Xs across ALL semesters? (Weekend/Gray settings remain.)')){
+        markState = {}; saveMarks(); if(currentSemester) renderSemester(currentSemester);
+      }
+      this.value = 'Options'; return;
     }
+    if(v==='addWeekends'){ setMode(mode==='addWeekends' ? 'normal':'addWeekends'); this.value='Options'; return; }
+    if(v==='grayOut'){     setMode(mode==='grayOut' ? 'normal':'grayOut');         this.value='Options'; return; }
+  });
 
-    /************** CONTROLS **************/
-    // Build semester list
-    const semesterSelect = document.getElementById("semesterSelect");
-    generateSemesters(2026, FUTURE_SEMESTER_COUNT).forEach(label => {
-      const opt = document.createElement("option");
-      opt.value = label;
-      opt.textContent = label;
-      semesterSelect.appendChild(opt);
-    });
+  document.addEventListener('keydown', e=>{ if(e.key==='Escape' && mode!=='normal') setMode('normal'); });
 
-    semesterSelect.addEventListener("change", (e) => {
-      currentSemester = e.target.value;
-      renderSemester(currentSemester);
-      setMode("normal"); // exit any special mode on semester change
-      actionsDropdown.value = "Options";
-    });
-
-    // Options dropdown
-    const actionsDropdown = document.getElementById("actionsDropdown");
-    actionsDropdown.addEventListener("change", function () {
-      const v = this.value;
-
-      if (v === "clear") {
-        const confirmClear = confirm("Clear all slashes and Xs across ALL semesters? (Weekend/Gray settings remain.)");
-        if (confirmClear) {
-          markState = {};
-          saveMarks();
-          // re-render current view
-          if (currentSemester) renderSemester(currentSemester);
-        }
-        this.value = "Options";
-        return;
-      }
-
-      if (v === "addWeekends") {
-        setMode(mode === "addWeekends" ? "normal" : "addWeekends");
-        this.value = "Options";
-        return;
-      }
-
-      if (v === "grayOut") {
-        setMode(mode === "grayOut" ? "normal" : "grayOut");
-        this.value = "Options";
-        return;
-      }
-    });
-
-    // ESC exits special modes
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && mode !== "normal") {
-        setMode("normal");
-      }
-    });
-
-    /************** INIT **************/
-    renderBlankFive(); // blank on load
+  /* ==============================================================
+     INIT
+     ==============================================================
+  */
+  renderBlankFive();
   </script>
 </body>
 </html>
